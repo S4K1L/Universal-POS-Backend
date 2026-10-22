@@ -17,7 +17,7 @@ from app.models.catalogue import Product
 from app.models.identity import User
 from app.models.platform import PlatformSetting, Plan
 from app.models.sales import Sale
-from app.models.tenant import Branch, Device, Tenant
+from app.models.tenant import Branch, Tenant
 from app.services.common import local_month_start, utcnow
 
 DEFAULT_PLATFORM_SETTINGS = {
@@ -117,7 +117,6 @@ async def usage(session: AsyncSession, tenant: Tenant) -> dict[str, int]:
         "products": await count(select(func.count()).select_from(Product).where(Product.tenant_id == tid, Product.active.is_(True))),
         "staff": await count(select(func.count()).select_from(User).where(User.tenant_id == tid, User.active.is_(True))),
         "branches": await count(select(func.count()).select_from(Branch).where(Branch.tenant_id == tid, Branch.active.is_(True))),
-        "devices": await count(select(func.count()).select_from(Device).where(Device.tenant_id == tid, Device.active.is_(True))),
         "sales_per_month": await count(
             select(func.count()).select_from(Sale).where(Sale.tenant_id == tid, Sale.sold_at >= month_start, Sale.status == "completed")
         ),

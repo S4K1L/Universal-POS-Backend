@@ -236,7 +236,7 @@ async def deliver(session: AsyncSession, *, tenant: Tenant, user: User, order_id
         salesperson_id=order.salesperson_id, order_id=order.id, lines=lines, bill_discount=order.discount,
         tax_mode=settings.get("tax", {}).get("mode", "inclusive"), cash_rounding="none", payments=payments, note=payload.note or f"Order {order.number}",
     )
-    outcome = await sales_service.create_sale(session, tenant=tenant, actor=user, device=None, payload=sale_in)
+    outcome = await sales_service.create_sale(session, tenant=tenant, actor=user, payload=sale_in)
     order.status, order.sale_id = "delivered", outcome.sale.id
     order.deposit_paid = q2(order.deposit_paid + final)
     for p in payload.payments:

@@ -17,11 +17,11 @@ STARTER = ["pos", "inventory", "purchases", "customers", "reports", "offline_syn
 # Placeholder prices (BDT). The super admin changes these from the console — they are not in code paths.
 PLANS = [
     dict(key="starter", name="Starter", tagline="One shop, one or two tills", monthly_price=999, yearly_price=9990, trial_days=14,
-         limits={"products": 1000, "staff": 3, "branches": 1, "devices": 2, "sales_per_month": -1}, features=STARTER, sort_order=1),
+         limits={"products": 1000, "staff": 3, "branches": 1, "sales_per_month": -1}, features=STARTER, sort_order=1),
     dict(key="business", name="Business", tagline="Growing shops with several staff and branches", monthly_price=1999, yearly_price=19990, trial_days=14,
-         limits={"products": 10000, "staff": 10, "branches": 3, "devices": 6, "sales_per_month": -1}, features=ALL_FEATURES, highlight=True, sort_order=2),
+         limits={"products": 10000, "staff": 10, "branches": 3, "sales_per_month": -1}, features=ALL_FEATURES, highlight=True, sort_order=2),
     dict(key="enterprise", name="Enterprise", tagline="Chains and large showrooms — no limits", monthly_price=4999, yearly_price=49990, trial_days=14,
-         limits={"products": -1, "staff": -1, "branches": -1, "devices": -1, "sales_per_month": -1}, features=ALL_FEATURES, sort_order=3),
+         limits={"products": -1, "staff": -1, "branches": -1, "sales_per_month": -1}, features=ALL_FEATURES, sort_order=3),
 ]
 
 CHANNELS = [

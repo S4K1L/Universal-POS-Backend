@@ -4,7 +4,7 @@ from tests.conftest import auth, new_id, now_iso
 from tests.helpers import create_product, line, pay, push, sale_event
 
 PLAN = {"key": "gold", "name": "Gold", "tagline": "test", "monthly_price": "2500.00", "yearly_price": "25000.00", "trial_days": 0,
-        "limits": {"products": -1, "staff": -1, "branches": 5, "devices": 5, "sales_per_month": -1},
+        "limits": {"products": -1, "staff": -1, "branches": 5, "sales_per_month": -1},
         "features": ["pos", "inventory", "purchases", "customers", "reports", "offline_sync", "staff"], "highlight": False, "public": True, "active": True, "sort_order": 9}
 
 

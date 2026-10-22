@@ -6,7 +6,7 @@ from app.core.capabilities import CAPABILITIES
 from app.core.permissions import ROLE_LABELS, effective_permissions
 from app.models.identity import User
 from app.models.platform import BusinessType
-from app.models.tenant import Branch, Device, Tenant
+from app.models.tenant import Branch, Tenant
 from app.services import subscription
 from app.services.common import utcnow
 

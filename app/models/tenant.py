@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import ForeignKey, Integer, String, UniqueConstraint
+from sqlalchemy import ForeignKey, Integer, String
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -51,24 +51,6 @@ class Branch(UUIDPK, TenantScoped, Timestamps, SyncTracked, Base):
 
     def sync_target(self) -> tuple[str, uuid.UUID]:
         return "context", self.tenant_id
-
-
-class Device(UUIDPK, TenantScoped, Timestamps, Base):
-    """A registered till. `device_code` prefixes every invoice number it issues offline,
-    so two devices can never mint the same number."""
-
-    __tablename__ = "devices"
-    __table_args__ = (UniqueConstraint("tenant_id", "device_code", name="uq_devices_tenant_code"),)
-
-    branch_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("branches.id", ondelete="CASCADE"), index=True)
-    name: Mapped[str] = mapped_column(String(120))
-    device_code: Mapped[str] = mapped_column(String(8))
-    platform: Mapped[str] = mapped_column(String(32), default="")
-    app_version: Mapped[str] = mapped_column(String(32), default="")
-    registered_by: Mapped[uuid.UUID | None] = mapped_column(nullable=True)
-    last_seen_at: Mapped[datetime | None] = mapped_column(nullable=True)
-    last_sync_at: Mapped[datetime | None] = mapped_column(nullable=True)
-    active: Mapped[bool] = mapped_column(default=True)
 
 
 class TenantCounter(Base):

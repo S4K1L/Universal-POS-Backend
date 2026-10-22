@@ -135,7 +135,7 @@ async def test_total_mismatch_is_flagged_but_the_receipt_wins(client, make_tenan
 
 
 async def pull(client, shop, cursor=0, limit=500) -> dict:
-    r = await client.get("/api/v1/sync/pull", headers=shop["headers"], params={"device_id": shop["device_id"], "cursor": cursor, "limit": limit})
+    r = await client.get("/api/v1/sync/pull", headers=shop["headers"], params={"cursor": cursor, "limit": limit})
     assert r.status_code == 200, r.text
     return r.json()
 

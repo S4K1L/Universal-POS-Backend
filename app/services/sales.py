@@ -23,7 +23,7 @@ from app.models.customers import Customer, CustomerLedger
 from app.models.identity import User
 from app.models.inventory import StockLot
 from app.models.sales import Sale, SaleLine, SaleLineAllocation, SalePayment, SaleReturn, SaleReturnLine
-from app.models.tenant import Branch, Device, Tenant
+from app.models.tenant import Branch, Tenant
 from app.schemas.sales import DuePaymentIn, ReturnIn, SaleCreateIn, VoidIn
 from app.services import inventory
 from app.services.common import audit, next_number, utcnow
@@ -83,7 +83,6 @@ async def create_sale(
     *,
     tenant: Tenant,
     actor: User,
-    device: Device | None,
     payload: SaleCreateIn,
     occurred_at: datetime | None = None,
 ) -> Outcome:
@@ -170,7 +169,7 @@ async def create_sale(
     can_override = _can(actor, "override_price")
 
     sale = Sale(
-        id=payload.id, tenant_id=tenant.id, branch_id=branch.id, device_id=device.id if device else None,
+        id=payload.id, tenant_id=tenant.id, branch_id=branch.id,
         shift_id=payload.shift_id, invoice_no=invoice_no, status="completed", sold_at=sold_at, received_at=now,
         customer_id=customer.id if customer else None,
         customer_name=(customer.name if customer else payload.customer_name) or "Walk-in",
@@ -215,7 +214,7 @@ async def create_sale(
         base_qty = line_models[idx].base_qty
         allocs, oversold = await inventory.allocate_out(
             session, tenant_id=tenant.id, branch_id=branch.id, product=product, variant=variant, qty=base_qty,
-            reason="sale", ref_type="sale", ref_id=sale.id, actor_id=actor.id, device_id=device.id if device else None,
+            reason="sale", ref_type="sale", ref_id=sale.id, actor_id=actor.id,
             occurred_at=sold_at,
         )
         allocations_by_line[idx] = allocs
@@ -244,7 +243,7 @@ async def create_sale(
             SalePayment(
                 id=p.id, tenant_id=tenant.id, sale_id=sale.id, method=p.method, amount=amount, reference=p.reference,
                 kind="sale", received_by=actor.id, received_by_name=actor.name,
-                device_id=device.id if device else None, paid_at=p.paid_at or sold_at,
+                paid_at=p.paid_at or sold_at,
             )
         )
 
@@ -269,7 +268,7 @@ async def create_sale(
 
 
 async def create_return(
-    session: AsyncSession, *, tenant: Tenant, actor: User, device: Device | None, payload: ReturnIn
+    session: AsyncSession, *, tenant: Tenant, actor: User, payload: ReturnIn
 ) -> SaleReturn:
     existing = await session.get(SaleReturn, payload.id)
     if existing is not None:
@@ -330,7 +329,7 @@ async def create_return(
             await inventory.put_back(
                 session, tenant_id=tenant.id, branch_id=sale.branch_id, product=product, variant=variant,
                 allocations=[(a.lot_id, a.qty) for a in allocs], qty=q3(rl.qty * line.unit_factor), reason="return",
-                ref_type="return", ref_id=ret.id, actor_id=actor.id, device_id=device.id if device else None,
+                ref_type="return", ref_id=ret.id, actor_id=actor.id,
                 occurred_at=now, unit_cost=line.unit_cost,
             )
 
@@ -354,7 +353,7 @@ async def create_return(
     return ret
 
 
-async def void_sale(session: AsyncSession, *, tenant: Tenant, actor: User, device: Device | None, payload: VoidIn) -> Sale:
+async def void_sale(session: AsyncSession, *, tenant: Tenant, actor: User, payload: VoidIn) -> Sale:
     if not _can(actor, "void_sale"):
         raise RejectEvent("This account may not void sales", code="permission_denied")
     sale = (
@@ -379,7 +378,7 @@ async def void_sale(session: AsyncSession, *, tenant: Tenant, actor: User, devic
         await inventory.put_back(
             session, tenant_id=tenant.id, branch_id=sale.branch_id, product=product, variant=variant,
             allocations=[(a.lot_id, a.qty) for a in allocs], qty=q3(left * line.unit_factor), reason="return",
-            ref_type="void", ref_id=sale.id, actor_id=actor.id, device_id=device.id if device else None,
+            ref_type="void", ref_id=sale.id, actor_id=actor.id,
             occurred_at=now, unit_cost=line.unit_cost,
         )
     if sale.customer_id and sale.due > 0:
@@ -394,7 +393,7 @@ async def void_sale(session: AsyncSession, *, tenant: Tenant, actor: User, devic
 
 
 async def receive_due_payment(
-    session: AsyncSession, *, tenant: Tenant, actor: User, device: Device | None, payload: DuePaymentIn
+    session: AsyncSession, *, tenant: Tenant, actor: User, payload: DuePaymentIn
 ) -> list[Sale]:
     if not _can(actor, "collect_dues"):
         raise RejectEvent("This account may not collect dues", code="permission_denied")
@@ -411,7 +410,7 @@ async def receive_due_payment(
         session.add(SalePayment(
             id=pay_id, tenant_id=tenant.id, sale_id=sale.id, method=payload.method, amount=amount,
             reference=payload.reference, kind="due", received_by=actor.id, received_by_name=actor.name,
-            device_id=device.id if device else None, paid_at=paid_at,
+            paid_at=paid_at,
         ))
         sale.paid = q2(sale.paid + amount)
         touched.append(sale)

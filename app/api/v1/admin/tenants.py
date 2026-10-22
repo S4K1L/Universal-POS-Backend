@@ -14,7 +14,7 @@ from app.models.catalogue import Product
 from app.models.identity import User
 from app.models.platform import BusinessType, Plan
 from app.models.sales import Sale
-from app.models.tenant import Branch, Device, Tenant
+from app.models.tenant import Branch, Tenant
 from app.schemas.tenant import TenantCreateIn, TenantUpdateIn
 from app.services import provisioning, subscription
 from app.services.common import audit, utcnow
@@ -35,7 +35,6 @@ async def tenant_rows(db: AsyncSession, tenants: list[Tenant]) -> list[dict]:
     staff = await grouped(User, User.active.is_(True))
     branches = await grouped(Branch, Branch.active.is_(True))
     products = await grouped(Product, Product.active.is_(True))
-    devices = await grouped(Device, Device.active.is_(True))
     since = utcnow() - timedelta(days=30)
     sales30 = await grouped(Sale, Sale.sold_at >= since, Sale.status == "completed")
     revenue = dict((await db.execute(select(Sale.tenant_id, func.coalesce(func.sum(Sale.total), 0)).where(
@@ -54,7 +53,7 @@ async def tenant_rows(db: AsyncSession, tenants: list[Tenant]) -> list[dict]:
             "days_left": state.days_left, "created_at": t.created_at.isoformat(),
             "last_active_at": t.last_active_at.isoformat() if t.last_active_at else None,
             "staff_count": staff.get(t.id, 0), "branch_count": branches.get(t.id, 0), "product_count": products.get(t.id, 0),
-            "device_count": devices.get(t.id, 0), "sales_30d": sales30.get(t.id, 0), "revenue_30d": str(revenue.get(t.id, 0)),
+            "sales_30d": sales30.get(t.id, 0), "revenue_30d": str(revenue.get(t.id, 0)),
             "capability_overrides": {k: v for k, v in (t.capability_overrides or {}).items() if k in ("enabled", "disabled")},
         })
     return out

@@ -77,7 +77,7 @@ async def get_sale(sale_id: uuid.UUID, ctx: Ctx = Depends(view), db: AsyncSessio
 
 @router.post("/sales", status_code=201, summary="Record a sale online (tills use /sync/push so it works offline too)")
 async def create_sale(body: SaleCreateIn, ctx: Ctx = Depends(tenant_ctx(permission=Permission.sell, feature="pos", write=True)), db: AsyncSession = Depends(get_db)) -> dict:
-    outcome = await sales_service.create_sale(db, tenant=ctx.tenant, actor=ctx.user, device=None, payload=body)
+    outcome = await sales_service.create_sale(db, tenant=ctx.tenant, actor=ctx.user, payload=body)
     await db.commit()
     return SaleOut.model_validate(outcome.sale).model_dump(mode="json")
 
@@ -85,7 +85,7 @@ async def create_sale(body: SaleCreateIn, ctx: Ctx = Depends(tenant_ctx(permissi
 @router.post("/sales/{sale_id}/void")
 async def void(sale_id: uuid.UUID, body: VoidIn, ctx: Ctx = Depends(tenant_ctx(permission=Permission.void_sale, feature="pos", write=True)),
                db: AsyncSession = Depends(get_db)) -> dict:
-    sale = await sales_service.void_sale(db, tenant=ctx.tenant, actor=ctx.user, device=None, payload=body.model_copy(update={"sale_id": sale_id}))
+    sale = await sales_service.void_sale(db, tenant=ctx.tenant, actor=ctx.user, payload=body.model_copy(update={"sale_id": sale_id}))
     await db.commit()
     return SaleOut.model_validate(await _one(db, ctx, Sale.id == sale.id)).model_dump(mode="json")
 
@@ -93,7 +93,7 @@ async def void(sale_id: uuid.UUID, body: VoidIn, ctx: Ctx = Depends(tenant_ctx(p
 @router.post("/sales/{sale_id}/returns", status_code=201)
 async def return_sale(sale_id: uuid.UUID, body: ReturnIn, ctx: Ctx = Depends(tenant_ctx(permission=Permission.refund, feature="pos", write=True)),
                       db: AsyncSession = Depends(get_db)) -> dict:
-    ret = await sales_service.create_return(db, tenant=ctx.tenant, actor=ctx.user, device=None, payload=body.model_copy(update={"sale_id": sale_id}))
+    ret = await sales_service.create_return(db, tenant=ctx.tenant, actor=ctx.user, payload=body.model_copy(update={"sale_id": sale_id}))
     await db.commit()
     return {"id": str(ret.id), "number": ret.number, "refund_total": str(ret.refund_total), "credit_applied": str(ret.credit_applied), "cash_refunded": str(ret.cash_refunded)}
 
@@ -101,7 +101,7 @@ async def return_sale(sale_id: uuid.UUID, body: ReturnIn, ctx: Ctx = Depends(ten
 @router.post("/sales/{sale_id}/payments", status_code=201, summary="Collect a due on one invoice")
 async def pay_due(sale_id: uuid.UUID, body: DuePaymentIn, ctx: Ctx = Depends(tenant_ctx(permission=Permission.collect_dues, feature="pos", write=True)),
                   db: AsyncSession = Depends(get_db)) -> dict:
-    touched = await sales_service.receive_due_payment(db, tenant=ctx.tenant, actor=ctx.user, device=None, payload=body.model_copy(update={"sale_id": sale_id}))
+    touched = await sales_service.receive_due_payment(db, tenant=ctx.tenant, actor=ctx.user, payload=body.model_copy(update={"sale_id": sale_id}))
     await db.commit()
     return SaleOut.model_validate(await _one(db, ctx, Sale.id == sale_id)).model_dump(mode="json") if touched else {"duplicate": True}
 
@@ -127,7 +127,7 @@ async def add_expense(body: ExpenseIn, ctx: Ctx = Depends(tenant_ctx(permission=
                       db: AsyncSession = Depends(get_db)) -> dict:
     from app.services.sync import _h_expense_create
 
-    result = await _h_expense_create(db, ctx.tenant, ctx.user, None, SyncEventIn(id=uuid.uuid4(), type="expense.create", occurred_at=utcnow(), payload=body.model_dump(mode="json")))
+    result = await _h_expense_create(db, ctx.tenant, ctx.user, SyncEventIn(id=uuid.uuid4(), type="expense.create", occurred_at=utcnow(), payload=body.model_dump(mode="json")))
     await db.commit()
     return result
 

@@ -15,5 +15,4 @@ class SyncEventIn(Strict):
 
 
 class PushIn(Strict):
-    device_id: uuid.UUID
     events: list[SyncEventIn] = Field(max_length=100)

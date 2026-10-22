@@ -24,7 +24,6 @@ class Permission(StrEnum):
     export_data = "export_data"
     manage_staff = "manage_staff"
     manage_branches = "manage_branches"
-    manage_devices = "manage_devices"
     manage_settings = "manage_settings"
     manage_subscription = "manage_subscription"
 
@@ -40,7 +39,7 @@ _ACCOUNTANT = {
 }
 _MANAGER = _CASHIER | _STOCK_KEEPER | {
     P.apply_discount, P.override_price, P.void_sale, P.refund, P.manage_expenses,
-    P.view_reports, P.view_margin, P.export_data, P.manage_devices, P.manage_orders,
+    P.view_reports, P.view_margin, P.export_data, P.manage_orders,
 }
 _OWNER = set(Permission)
 

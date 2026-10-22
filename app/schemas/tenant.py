@@ -1,4 +1,3 @@
-import uuid
 from datetime import datetime
 
 from pydantic import Field
@@ -56,9 +55,3 @@ class SettingsUpdateIn(Strict):
     scale_mode: str | None = Field(default=None, pattern="^(weight|price)$")
     deposit_percent_min: int | None = Field(default=None, ge=0, le=100)
 
-
-class DeviceRegisterIn(Strict):
-    name: str = Field(min_length=1, max_length=120)
-    branch_id: uuid.UUID
-    platform: str = Field(default="", max_length=32)
-    app_version: str = Field(default="", max_length=32)

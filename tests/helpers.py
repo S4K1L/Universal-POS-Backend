@@ -22,7 +22,7 @@ def sale_event(shop: dict, lines: list[dict], *, payments=None, customer_id=None
                tax_mode="inclusive", cash_rounding="none", totals=None, event_id=None, sale_id=None) -> dict:
     sale_id = sale_id or new_id()
     payload = {
-        "id": sale_id, "invoice_no": invoice_no or f"INV-{shop['device']['device_code']}-{uuid.uuid4().hex[:6].upper()}",
+        "id": sale_id, "invoice_no": invoice_no or f"INV-TEST-{uuid.uuid4().hex[:6].upper()}",
         "sold_at": now_iso(), "branch_id": shop["branch_id"], "customer_id": customer_id, "customer_name": "Walk-in",
         "lines": [{"id": new_id(), **l} for l in lines], "bill_discount": bill_discount, "tax_mode": tax_mode,
         "cash_rounding": cash_rounding,
@@ -42,6 +42,6 @@ def pay(amount, method="cash") -> dict:
 
 
 async def push(client, shop, events: list[dict], headers=None) -> list[dict]:
-    r = await client.post("/api/v1/sync/push", json={"device_id": shop["device_id"], "events": events}, headers=headers or shop["headers"])
+    r = await client.post("/api/v1/sync/push", json={"events": events}, headers=headers or shop["headers"])
     assert r.status_code == 200, r.text
     return r.json()["results"]

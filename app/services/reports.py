@@ -256,16 +256,16 @@ async def daybook(session: AsyncSession, tenant: Tenant, day: date, branch_id: u
 
 
 async def shift_expected_cash(session: AsyncSession, shift: Shift, until: datetime | None = None) -> Decimal:
-    """Float + cash taken − cash paid out, over the shift's window on its own till."""
+    """Float + cash taken − cash paid out, over the shift's window at its branch."""
     until = until or utcnow()
     cash_in = (await session.execute(
-        select(_sum(SalePayment.amount)).where(
+        select(_sum(SalePayment.amount)).select_from(SalePayment).join(Sale, Sale.id == SalePayment.sale_id).where(
             SalePayment.tenant_id == shift.tenant_id, SalePayment.method == "cash", SalePayment.kind != "return",
-            SalePayment.device_id == shift.device_id, SalePayment.paid_at >= shift.opened_at, SalePayment.paid_at <= until)
+            Sale.branch_id == shift.branch_id, SalePayment.paid_at >= shift.opened_at, SalePayment.paid_at <= until)
     )).scalar_one()
     cash_expense = (await session.execute(
         select(_sum(Expense.amount)).where(
-            Expense.tenant_id == shift.tenant_id, Expense.method == "cash", Expense.device_id == shift.device_id,
+            Expense.tenant_id == shift.tenant_id, Expense.method == "cash", Expense.branch_id == shift.branch_id,
             Expense.spent_at >= shift.opened_at, Expense.spent_at <= until)
     )).scalar_one()
     cash_refunds = (await session.execute(

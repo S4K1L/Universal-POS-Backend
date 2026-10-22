@@ -1,21 +1,21 @@
-"""The signed-in business: context, settings, branches, devices."""
+"""The signed-in business: context, settings, branches."""
 import uuid
 
 from fastapi import APIRouter, Depends
 from pydantic import Field
-from sqlalchemy import func, select
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import Ctx, tenant_ctx
 from app.core.errors import ConflictError, NotFoundError, ValidationFailed
 from app.core.permissions import Permission
 from app.db.session import get_db
-from app.models.tenant import Branch, Device
+from app.models.tenant import Branch
 from app.schemas.common import Strict
-from app.schemas.tenant import DeviceRegisterIn, SettingsUpdateIn
+from app.schemas.tenant import SettingsUpdateIn
 from app.services import context as context_service
 from app.services import subscription
-from app.services.common import audit, next_counter
+from app.services.common import audit
 
 router = APIRouter(tags=["Workspace"])
 
@@ -143,59 +143,3 @@ async def update_branch(branch_id: uuid.UUID, body: BranchIn, ctx: Ctx = Depends
     await db.commit()
     return branch_out(b)
 
-
-# ------------------------------------------------------------------ devices
-
-
-def device_out(d: Device) -> dict:
-    return {"id": str(d.id), "name": d.name, "device_code": d.device_code, "branch_id": str(d.branch_id), "platform": d.platform,
-            "app_version": d.app_version, "last_seen_at": d.last_seen_at.isoformat() if d.last_seen_at else None,
-            "last_sync_at": d.last_sync_at.isoformat() if d.last_sync_at else None, "active": d.active}
-
-
-@router.post("/devices/register", status_code=201, summary="Register this till; returns the code that prefixes its offline invoice numbers")
-async def register_device(body: DeviceRegisterIn, ctx: Ctx = Depends(tenant_ctx(permission=Permission.manage_devices, write=True)),
-                          db: AsyncSession = Depends(get_db)) -> dict:
-    branch = await db.get(Branch, body.branch_id)
-    if branch is None or branch.tenant_id != ctx.tenant.id or not branch.active:
-        raise NotFoundError("Branch not found")
-    await subscription.assert_within_limit(db, ctx.tenant, "devices")
-    taken = {c for (c,) in (await db.execute(select(Device.device_code).where(Device.tenant_id == ctx.tenant.id))).all()}
-    while True:  # codes only need to be unique per business; skip any already in use
-        n = await next_counter(db, tenant_id=ctx.tenant.id, name="device")
-        code = f"D{n:02d}"
-        if code not in taken:
-            break
-    d = Device(tenant_id=ctx.tenant.id, branch_id=branch.id, name=body.name.strip(), device_code=code,
-               platform=body.platform, app_version=body.app_version, registered_by=ctx.user.id)
-    db.add(d)
-    await audit(db, action="device.registered", actor=ctx.user, tenant_id=ctx.tenant.id, entity="device", entity_id=d.id, summary=f"{d.name} ({d.device_code}) at {branch.name}")
-    await db.commit()
-    return device_out(d)
-
-
-@router.get("/devices")
-async def list_devices(ctx: Ctx = Depends(tenant_ctx(permission=Permission.manage_devices, allow_lapsed=True)), db: AsyncSession = Depends(get_db)) -> list[dict]:
-    rows = (await db.execute(select(Device).where(Device.tenant_id == ctx.tenant.id).order_by(Device.device_code))).scalars().all()
-    return [device_out(d) for d in rows]
-
-
-class DevicePatch(Strict):
-    name: str | None = Field(default=None, min_length=1, max_length=120)
-    active: bool | None = None
-
-
-@router.patch("/devices/{device_id}")
-async def update_device(device_id: uuid.UUID, body: DevicePatch, ctx: Ctx = Depends(tenant_ctx(permission=Permission.manage_devices, write=True)),
-                        db: AsyncSession = Depends(get_db)) -> dict:
-    d = await db.get(Device, device_id)
-    if d is None or d.tenant_id != ctx.tenant.id:
-        raise NotFoundError("Device not found")
-    if body.name:
-        d.name = body.name.strip()
-    if body.active is not None:
-        if body.active and not d.active:
-            await subscription.assert_within_limit(db, ctx.tenant, "devices")
-        d.active = body.active
-    await db.commit()
-    return device_out(d)

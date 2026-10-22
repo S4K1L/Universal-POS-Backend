@@ -50,7 +50,6 @@ async def post_movement(
     ref_type: str = "",
     ref_id: uuid.UUID | None = None,
     actor_id: uuid.UUID | None = None,
-    device_id: uuid.UUID | None = None,
     note: str = "",
     occurred_at: datetime | None = None,
 ) -> StockBalance:
@@ -63,7 +62,7 @@ async def post_movement(
         StockMovement(
             tenant_id=tenant_id, branch_id=branch_id, variant_id=variant_id, lot_id=lot_id, qty_delta=qty_delta,
             unit_cost=unit_cost, reason=reason, ref_type=ref_type, ref_id=ref_id, actor_id=actor_id,
-            device_id=device_id, note=note[:255], occurred_at=occurred_at or utcnow(), created_at=utcnow(),
+            note=note[:255], occurred_at=occurred_at or utcnow(), created_at=utcnow(),
         )
     )
     return balance
@@ -88,7 +87,6 @@ async def allocate_out(
     ref_type: str,
     ref_id: uuid.UUID,
     actor_id: uuid.UUID | None,
-    device_id: uuid.UUID | None,
     occurred_at: datetime,
     note: str = "",
 ) -> tuple[list[Allocation], bool]:
@@ -128,7 +126,7 @@ async def allocate_out(
         await post_movement(
             session, tenant_id=tenant_id, branch_id=branch_id, variant_id=variant.id, qty_delta=-alloc.qty,
             reason=reason, unit_cost=alloc.unit_cost, lot_id=alloc.lot_id, ref_type=ref_type, ref_id=ref_id,
-            actor_id=actor_id, device_id=device_id, note=note, occurred_at=occurred_at,
+            actor_id=actor_id, note=note, occurred_at=occurred_at,
         )
     # "oversold" is only meaningful when the branch balance actually went below zero
     balance = await balance_for_update(session, tenant_id, branch_id, variant.id)
@@ -148,7 +146,6 @@ async def put_back(
     ref_type: str,
     ref_id: uuid.UUID,
     actor_id: uuid.UUID | None,
-    device_id: uuid.UUID | None,
     occurred_at: datetime,
     unit_cost: Decimal,
 ) -> None:
@@ -167,14 +164,14 @@ async def put_back(
         await post_movement(
             session, tenant_id=tenant_id, branch_id=branch_id, variant_id=variant.id, qty_delta=take, reason=reason,
             unit_cost=unit_cost, lot_id=lot_id, ref_type=ref_type, ref_id=ref_id, actor_id=actor_id,
-            device_id=device_id, occurred_at=occurred_at,
+            occurred_at=occurred_at,
         )
         remaining = q3(remaining - take)
     if remaining > 0:
         await post_movement(
             session, tenant_id=tenant_id, branch_id=branch_id, variant_id=variant.id, qty_delta=remaining,
             reason=reason, unit_cost=unit_cost, ref_type=ref_type, ref_id=ref_id, actor_id=actor_id,
-            device_id=device_id, occurred_at=occurred_at,
+            occurred_at=occurred_at,
         )
 
 
@@ -202,7 +199,6 @@ async def receive_stock(
     ref_type: str = "",
     ref_id: uuid.UUID | None = None,
     actor_id: uuid.UUID | None = None,
-    device_id: uuid.UUID | None = None,
     update_average_cost: bool = True,
 ) -> StockLot | None:
     """Add stock (purchase receipt, opening balance, positive adjustment) and, for the
@@ -227,6 +223,6 @@ async def receive_stock(
     await post_movement(
         session, tenant_id=tenant_id, branch_id=branch_id, variant_id=variant.id, qty_delta=qty, reason=reason,
         unit_cost=unit_cost, lot_id=lot.id if lot else None, ref_type=ref_type, ref_id=ref_id, actor_id=actor_id,
-        device_id=device_id, occurred_at=now,
+        occurred_at=now,
     )
     return lot

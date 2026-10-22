@@ -54,7 +54,6 @@ class StockMovement(UUIDPK, TenantScoped, Base):
     ref_type: Mapped[str] = mapped_column(String(24), default="")
     ref_id: Mapped[uuid.UUID | None] = mapped_column(nullable=True)
     actor_id: Mapped[uuid.UUID | None] = mapped_column(nullable=True)
-    device_id: Mapped[uuid.UUID | None] = mapped_column(nullable=True)
     note: Mapped[str] = mapped_column(String(255), default="")
     occurred_at: Mapped[datetime] = mapped_column()
     created_at: Mapped[datetime] = mapped_column()

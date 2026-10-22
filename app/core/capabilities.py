@@ -92,6 +92,5 @@ LIMIT_KEYS: dict[str, str] = {
     "products": "Products",
     "staff": "Staff accounts",
     "branches": "Branches",
-    "devices": "Registered devices",
     "sales_per_month": "Sales per month",
 }

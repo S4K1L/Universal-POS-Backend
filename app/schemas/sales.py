@@ -174,7 +174,6 @@ class SaleOut(Out):
     invoice_no: str
     status: str
     branch_id: uuid.UUID
-    device_id: uuid.UUID | None
     sold_at: datetime
     customer_id: uuid.UUID | None
     customer_name: str

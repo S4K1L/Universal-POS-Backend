@@ -77,7 +77,7 @@ async def open_invoices(customer_id: uuid.UUID, ctx: Ctx = Depends(view), db: As
 async def collect(customer_id: uuid.UUID, body: DuePaymentIn, ctx: Ctx = Depends(tenant_ctx(permission=Permission.collect_dues, feature="customers", write=True)),
                   db: AsyncSession = Depends(get_db)) -> dict:
     body = body.model_copy(update={"customer_id": customer_id})
-    touched = await sales_service.receive_due_payment(db, tenant=ctx.tenant, actor=ctx.user, device=None, payload=body)
+    touched = await sales_service.receive_due_payment(db, tenant=ctx.tenant, actor=ctx.user, payload=body)
     await db.commit()
     c = await db.get(Customer, customer_id)
     return {"applied_to": [s.invoice_no for s in touched], "balance": str(c.balance)}

@@ -21,7 +21,6 @@ class Sale(UUIDPK, TenantScoped, Base):
 
     server_seq: Mapped[int] = mapped_column(BigInteger, Identity(always=False))
     branch_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("branches.id", ondelete="RESTRICT"), index=True)
-    device_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("devices.id", ondelete="SET NULL"), nullable=True)
     shift_id: Mapped[uuid.UUID | None] = mapped_column(nullable=True)
     invoice_no: Mapped[str] = mapped_column(String(40))
     status: Mapped[str] = mapped_column(String(12), default="completed")  # completed|voided
@@ -109,7 +108,6 @@ class SalePayment(UUIDPK, TenantScoped, Base):
     kind: Mapped[str] = mapped_column(String(10), default="sale")  # sale|due|deposit
     received_by: Mapped[uuid.UUID | None] = mapped_column(nullable=True)
     received_by_name: Mapped[str] = mapped_column(String(160), default="")
-    device_id: Mapped[uuid.UUID | None] = mapped_column(nullable=True)
     paid_at: Mapped[datetime] = mapped_column()
 
     sale: Mapped[Sale] = relationship(back_populates="payments")
@@ -151,7 +149,6 @@ class Expense(UUIDPK, TenantScoped, Base):
     __tablename__ = "expenses"
 
     branch_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("branches.id", ondelete="CASCADE"), index=True)
-    device_id: Mapped[uuid.UUID | None] = mapped_column(nullable=True)
     category: Mapped[str] = mapped_column(String(60), default="General")
     amount: Mapped[Decimal] = mapped_column()
     method: Mapped[str] = mapped_column(String(16), default="cash")
@@ -165,7 +162,6 @@ class Shift(UUIDPK, TenantScoped, Base):
     __tablename__ = "shifts"
 
     branch_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("branches.id", ondelete="CASCADE"), index=True)
-    device_id: Mapped[uuid.UUID | None] = mapped_column(nullable=True)
     opened_by: Mapped[uuid.UUID | None] = mapped_column(nullable=True)
     opened_by_name: Mapped[str] = mapped_column(String(160), default="")
     opened_at: Mapped[datetime] = mapped_column()

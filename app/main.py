@@ -15,7 +15,7 @@ from app.core.errors import DomainError
 
 TAGS = [
     {"name": "Auth", "description": "Phone + password login, refresh rotation."},
-    {"name": "Workspace", "description": "The signed-in business: context, settings, branches, devices."},
+    {"name": "Workspace", "description": "The signed-in business: context, settings, branches."},
     {"name": "Sync", "description": "Offline sync: idempotent event push and cursor-based change pull."},
     {"name": "Catalogue", "description": "Products, variants, barcodes — validated against the business type."},
     {"name": "Inventory", "description": "Stock ledger, lots, suppliers, purchases."},

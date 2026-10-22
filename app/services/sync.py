@@ -27,7 +27,7 @@ from app.models.identity import User
 from app.models.inventory import StockBalance
 from app.models.sales import Expense, Shift
 from app.models.sync import SyncChange, SyncEvent
-from app.models.tenant import Branch, Device, Tenant
+from app.models.tenant import Branch, Tenant
 from app.schemas.sales import (
     CustomerUpsertIn, DuePaymentIn, ExpenseIn, ReturnIn, SaleCreateIn, ShiftCloseIn, ShiftOpenIn, StockAdjustIn, VoidIn,
 )
@@ -53,31 +53,31 @@ async def _can(user: User, permission: str) -> bool:
     return permission in {p.value for p in effective_permissions(user.role, user.permissions)}
 
 
-async def _h_sale_create(session, tenant, actor, device, ev: SyncEventIn) -> dict:
+async def _h_sale_create(session, tenant, actor, ev: SyncEventIn) -> dict:
     payload = _validate(SaleCreateIn, ev.payload)
-    outcome = await sales_service.create_sale(session, tenant=tenant, actor=actor, device=device, payload=payload)
+    outcome = await sales_service.create_sale(session, tenant=tenant, actor=actor, payload=payload)
     return {
         "invoice_no": outcome.sale.invoice_no, "server_seq": outcome.sale.server_seq,
         "flags": [f["code"] for f in outcome.flags], "duplicate": outcome.duplicate,
     }
 
 
-async def _h_sale_return(session, tenant, actor, device, ev):
-    ret = await sales_service.create_return(session, tenant=tenant, actor=actor, device=device, payload=_validate(ReturnIn, ev.payload))
+async def _h_sale_return(session, tenant, actor, ev):
+    ret = await sales_service.create_return(session, tenant=tenant, actor=actor, payload=_validate(ReturnIn, ev.payload))
     return {"number": ret.number, "refund_total": str(ret.refund_total)}
 
 
-async def _h_sale_void(session, tenant, actor, device, ev):
-    sale = await sales_service.void_sale(session, tenant=tenant, actor=actor, device=device, payload=_validate(VoidIn, ev.payload))
+async def _h_sale_void(session, tenant, actor, ev):
+    sale = await sales_service.void_sale(session, tenant=tenant, actor=actor, payload=_validate(VoidIn, ev.payload))
     return {"invoice_no": sale.invoice_no}
 
 
-async def _h_payment_receive(session, tenant, actor, device, ev):
-    touched = await sales_service.receive_due_payment(session, tenant=tenant, actor=actor, device=device, payload=_validate(DuePaymentIn, ev.payload))
+async def _h_payment_receive(session, tenant, actor, ev):
+    touched = await sales_service.receive_due_payment(session, tenant=tenant, actor=actor, payload=_validate(DuePaymentIn, ev.payload))
     return {"invoices": [s.invoice_no for s in touched]}
 
 
-async def _h_customer_upsert(session, tenant, actor, device, ev):
+async def _h_customer_upsert(session, tenant, actor, ev):
     p = _validate(CustomerUpsertIn, ev.payload)
     if not await _can(actor, "manage_customers"):
         raise RejectEvent("This account may not edit customers", code="permission_denied")
@@ -93,7 +93,7 @@ async def _h_customer_upsert(session, tenant, actor, device, ev):
     return {"id": str(customer.id)}
 
 
-async def _h_stock_adjust(session, tenant, actor, device, ev):
+async def _h_stock_adjust(session, tenant, actor, ev):
     p = _validate(StockAdjustIn, ev.payload)
     if not await _can(actor, "adjust_stock"):
         raise RejectEvent("This account may not adjust stock", code="permission_denied")
@@ -122,12 +122,12 @@ async def _h_stock_adjust(session, tenant, actor, device, ev):
             session, tenant_id=tenant.id, branch_id=branch.id, product=product, variant=variant, qty=delta,
             unit_cost=p.unit_cost if p.unit_cost is not None else variant.cost, reason=reason, lot_no=p.lot_no or "ADJ",
             expiry=p.expiry.date() if p.expiry else None, ref_type="adjust", ref_id=p.id, actor_id=actor.id,
-            device_id=device.id if device else None, update_average_cost=p.unit_cost is not None,
+            update_average_cost=p.unit_cost is not None,
         )
     else:
         await inventory.allocate_out(
             session, tenant_id=tenant.id, branch_id=branch.id, product=product, variant=variant, qty=-delta,
-            reason=reason, ref_type="adjust", ref_id=p.id, actor_id=actor.id, device_id=device.id if device else None,
+            reason=reason, ref_type="adjust", ref_id=p.id, actor_id=actor.id,
             occurred_at=ev.occurred_at, note=p.note,
         )
     await audit(session, action="stock.adjust", actor=actor, tenant_id=tenant.id, entity="variant", entity_id=variant.id,
@@ -135,7 +135,7 @@ async def _h_stock_adjust(session, tenant, actor, device, ev):
     return {"delta": str(delta)}
 
 
-async def _h_expense_create(session, tenant, actor, device, ev):
+async def _h_expense_create(session, tenant, actor, ev):
     p = _validate(ExpenseIn, ev.payload)
     if not await _can(actor, "manage_expenses"):
         raise RejectEvent("This account may not record expenses", code="permission_denied")
@@ -144,26 +144,26 @@ async def _h_expense_create(session, tenant, actor, device, ev):
         raise RejectEvent("Unknown branch", code="unknown_branch")
     if await session.get(Expense, p.id) is None:
         session.add(Expense(
-            id=p.id, tenant_id=tenant.id, branch_id=branch.id, device_id=device.id if device else None,
+            id=p.id, tenant_id=tenant.id, branch_id=branch.id,
             category=p.category, amount=p.amount, method=p.method, note=p.note, spent_at=p.spent_at or ev.occurred_at,
             created_by=actor.id, created_by_name=actor.name,
         ))
     return {"id": str(p.id)}
 
 
-async def _h_shift_open(session, tenant, actor, device, ev):
+async def _h_shift_open(session, tenant, actor, ev):
     p = _validate(ShiftOpenIn, ev.payload)
     if not await _can(actor, "manage_shifts"):
         raise RejectEvent("This account may not open a shift", code="permission_denied")
     if await session.get(Shift, p.id) is None:
         session.add(Shift(
-            id=p.id, tenant_id=tenant.id, branch_id=p.branch_id, device_id=device.id if device else None,
+            id=p.id, tenant_id=tenant.id, branch_id=p.branch_id,
             opened_by=actor.id, opened_by_name=actor.name, opened_at=p.opened_at, opening_float=p.opening_float, status="open",
         ))
     return {"id": str(p.id)}
 
 
-async def _h_shift_close(session, tenant, actor, device, ev):
+async def _h_shift_close(session, tenant, actor, ev):
     from app.services.reports import shift_expected_cash
 
     p = _validate(ShiftCloseIn, ev.payload)
@@ -193,10 +193,6 @@ HANDLERS = {
 
 
 async def push(session: AsyncSession, *, tenant: Tenant, user: User, payload: PushIn) -> list[dict]:
-    device = await session.get(Device, payload.device_id)
-    if device is None or device.tenant_id != tenant.id or not device.active:
-        raise RejectEvent("This device is not registered (or was removed). Register it again.", code="unknown_device")
-
     results: list[dict] = []
     for ev in payload.events:
         existing = (await session.execute(
@@ -215,8 +211,8 @@ async def push(session: AsyncSession, *, tenant: Tenant, user: User, payload: Pu
                 from app.services.sales import _actor  # local import: tiny helper shared with sales
 
                 actor = await _actor(session, tenant.id, ev.actor_id, user)
-                result = await handler(session, tenant, actor, device, ev)
-                session.add(SyncEvent(tenant_id=tenant.id, event_id=ev.id, device_id=device.id, type=ev.type, result=result))
+                result = await handler(session, tenant, actor, ev)
+                session.add(SyncEvent(tenant_id=tenant.id, event_id=ev.id, type=ev.type, result=result))
                 await session.flush()
             results.append({"id": str(ev.id), "status": "applied", **result})
         except RejectEvent as exc:
@@ -232,9 +228,6 @@ async def push(session: AsyncSession, *, tenant: Tenant, user: User, payload: Pu
             else:
                 results.append({"id": str(ev.id), "status": "rejected", "code": "conflict", "message": "Could not apply this event; it conflicts with existing data."})
 
-    now = utcnow()
-    device.last_sync_at = now
-    device.last_seen_at = now
     return results
 
 
@@ -256,17 +249,17 @@ async def compact_changes(session: AsyncSession, tenant_id: uuid.UUID) -> int:
 
 
 async def pull(
-    session: AsyncSession, *, tenant: Tenant, user: User, device: Device, cursor: int, limit: int = PULL_PAGE
+    session: AsyncSession, *, tenant: Tenant, user: User, cursor: int, limit: int = PULL_PAGE
 ) -> dict:
     if cursor <= 0:
         await compact_changes(session, tenant.id)
     limit = max(1, min(limit, 1000))
+    conditions = [SyncChange.tenant_id == tenant.id, SyncChange.seq > cursor]
+    if user.branch_ids is not None:  # a branch-restricted user only receives their own branches' rows
+        conditions.append(SyncChange.branch_id.is_(None) | SyncChange.branch_id.in_([uuid.UUID(b) for b in user.branch_ids]))
     rows = (await session.execute(
         select(SyncChange)
-        .where(
-            SyncChange.tenant_id == tenant.id, SyncChange.seq > cursor,
-            (SyncChange.branch_id.is_(None)) | (SyncChange.branch_id == device.branch_id),
-        )
+        .where(*conditions)
         .order_by(SyncChange.seq).limit(limit + 1)
     )).scalars().all()
     has_more = len(rows) > limit
@@ -313,5 +306,4 @@ async def pull(
         else:
             changes.append({"seq": r.seq, "entity": entity, "id": str(eid), "op": "upsert", "data": loaded[(entity, eid)]})
 
-    device.last_seen_at = utcnow()
     return {"cursor": next_cursor, "has_more": has_more, "changes": changes, "server_time": utcnow().isoformat()}

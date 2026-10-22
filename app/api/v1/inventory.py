@@ -78,14 +78,14 @@ async def lots(variant_id: uuid.UUID | None = None, branch_id: uuid.UUID | None 
              "qty": str(l.qty_on_hand), "branch_id": str(l.branch_id)} for l in rows]
 
 
-@router.post("/stock/adjust", summary="Correct stock online (devices use the sync event of the same name)")
+@router.post("/stock/adjust", summary="Correct stock online (the till uses the sync event of the same name)")
 async def adjust(body: StockAdjustIn, ctx: Ctx = Depends(tenant_ctx(permission=Permission.adjust_stock, feature="inventory", write=True)),
                  db: AsyncSession = Depends(get_db)) -> dict:
     from app.schemas.sync import SyncEventIn
     from app.services.sync import _h_stock_adjust
 
     ev = SyncEventIn(id=body.id, type="stock.adjust", occurred_at=utcnow(), payload=body.model_dump(mode="json"))
-    result = await _h_stock_adjust(db, ctx.tenant, ctx.user, None, ev)
+    result = await _h_stock_adjust(db, ctx.tenant, ctx.user, ev)
     await db.commit()
     return result
 

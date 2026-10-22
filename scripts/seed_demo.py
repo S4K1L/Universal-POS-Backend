@@ -27,7 +27,7 @@ from app.models.customers import Customer  # noqa: E402
 from app.models.identity import User  # noqa: E402
 from app.models.inventory import StockBalance, Supplier  # noqa: E402
 from app.models.sales import Expense  # noqa: E402
-from app.models.tenant import Branch, Device  # noqa: E402
+from app.models.tenant import Branch  # noqa: E402
 from app.schemas.sales import SaleCreateIn, SaleLineIn, SalePaymentIn  # noqa: E402
 from app.schemas.tenant import TenantCreateIn  # noqa: E402
 from app.seeds.platform import seed_platform  # noqa: E402
@@ -91,8 +91,6 @@ async def seed_shop(session, admin: User, spec: dict) -> None:
         users[role if role not in users else f"{role}2"] = u
     await session.flush()
 
-    device = Device(tenant_id=tenant.id, branch_id=main.id, name="Counter 1", device_code="D01", platform="demo", registered_by=owner.id)
-    session.add(device)
     branches = [main]
     if spec.get("second_branch"):
         b2 = Branch(tenant_id=tenant.id, name=spec["second_branch"], code=spec["second_branch"][:4].upper(), address="Uttara Sector 7")
@@ -100,7 +98,6 @@ async def seed_shop(session, admin: User, spec: dict) -> None:
         await session.flush()
         branches.append(b2)
         users["cashier2"].branch_ids = [str(b2.id)]  # the second cashier works only at Uttara
-        session.add(Device(tenant_id=tenant.id, branch_id=b2.id, name="Uttara counter", device_code="D02", platform="demo", registered_by=owner.id))
     await session.flush()
 
     customers = []
@@ -182,7 +179,7 @@ async def seed_shop(session, admin: User, spec: dict) -> None:
             paid = priced.total if not on_credit else q2(priced.total * Decimal(rng.choice(["0", "0", "0.3", "0.5"])))
             payments = [SalePaymentIn(id=uuid7(), method=rng.choice(methods), amount=paid, paid_at=when)] if paid > 0 else []
             seq += 1
-            await sales_service.create_sale(session, tenant=tenant, actor=actor, device=device if branch.id == main.id else None, payload=SaleCreateIn(
+            await sales_service.create_sale(session, tenant=tenant, actor=actor, payload=SaleCreateIn(
                 id=uuid7(), invoice_no=f"INV-D01-{seq:06d}", sold_at=when, branch_id=branch.id, customer_id=customer.id if customer else None,
                 customer_name=customer.name if customer else "Walk-in", lines=lines, tax_mode=tax_mode, cash_rounding=rounding, payments=payments))
             made += 1
@@ -209,7 +206,7 @@ async def seed_shop(session, admin: User, spec: dict) -> None:
         for back in range(9, -1, -1):
             for cat, lo, hi in (("Tea & snacks", 60, 220), ("Transport", 150, 600)):
                 if rng.random() < 0.6:
-                    session.add(Expense(tenant_id=tenant.id, branch_id=main.id, device_id=device.id, category=cat, amount=Decimal(rng.randint(lo, hi)),
+                    session.add(Expense(tenant_id=tenant.id, branch_id=main.id, category=cat, amount=Decimal(rng.randint(lo, hi)),
                                         method="cash", note="", spent_at=dhaka_to_utc(today - timedelta(days=back), rng.randint(10, 18), rng.randint(0, 59)),
                                         created_by=owner.id, created_by_name=owner.name))
 

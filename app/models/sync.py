@@ -16,7 +16,6 @@ class SyncEvent(UUIDPK, TenantScoped, Base):
     __table_args__ = (UniqueConstraint("tenant_id", "event_id", name="uq_sync_events_tenant_event"),)
 
     event_id: Mapped[uuid.UUID] = mapped_column()
-    device_id: Mapped[uuid.UUID | None] = mapped_column(nullable=True)
     type: Mapped[str] = mapped_column(String(32))
     result: Mapped[dict] = mapped_column(JSONB, default=dict)
     applied_at: Mapped[datetime] = mapped_column(server_default=func.now())

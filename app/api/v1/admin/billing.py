@@ -15,7 +15,7 @@ from app.db.session import get_db
 from app.models.identity import User
 from app.models.platform import AuditLog, PaymentChannel, PaymentRequest, Plan, SubscriptionInvoice
 from app.models.sales import Sale
-from app.models.tenant import Device, Tenant
+from app.models.tenant import Tenant
 from app.schemas.common import Strict
 from app.services import billing as svc
 from app.services import subscription
@@ -184,14 +184,11 @@ async def overview(db: AsyncSession = Depends(get_db)) -> dict:
     revenue = (await db.execute(select(month, func.sum(SubscriptionInvoice.amount)).where(SubscriptionInvoice.created_at >= since).group_by(month).order_by(month))).all()
     signups_m = func.to_char(Tenant.created_at, "YYYY-MM")
     signups = (await db.execute(select(signups_m, func.count()).where(Tenant.created_at >= since).group_by(signups_m).order_by(signups_m))).all()
-    devices = (await db.execute(select(func.count()).select_from(Device).where(Device.active.is_(True)))).scalar_one()
-    stale = (await db.execute(select(func.count()).select_from(Device).where(Device.active.is_(True), (Device.last_sync_at.is_(None)) | (Device.last_sync_at < now - timedelta(days=1))))).scalar_one()
     sales_today = (await db.execute(select(func.count(), func.coalesce(func.sum(Sale.total), 0)).where(Sale.sold_at >= now - timedelta(hours=24), Sale.status == "completed"))).one()
     return {
         "tenants": len(tenants), "by_state": by_status, "by_business_type": by_type, "by_plan": by_plan,
         "mrr": str(q2(mrr)), "pending_payments": int(pending), "expiring_in_7_days": expiring_soon, "lapsed": lapsed,
         "revenue_by_month": [{"month": m, "amount": str(q2(a))} for m, a in revenue],
         "signups_by_month": [{"month": m, "count": int(c)} for m, c in signups],
-        "devices": int(devices), "devices_not_synced_24h": int(stale),
         "sales_24h": {"count": int(sales_today[0]), "total": str(q2(sales_today[1]))},
     }

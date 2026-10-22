@@ -99,10 +99,7 @@ async def make_tenant(client, admin):
         ctx = session["context"]
         main = next(b for b in ctx["branches"] if b["is_main"])
         h = auth(session["access_token"])
-        dr = await client.post("/api/v1/devices/register", json={"name": "Till 1", "branch_id": main["id"], "platform": "test"}, headers=h)
-        assert dr.status_code == 201, dr.text
-        return {"tenant": tenant, "phone": phone, "headers": h, "context": ctx, "branch_id": main["id"], "device": dr.json(),
-                "device_id": dr.json()["id"], "session": session}
+        return {"tenant": tenant, "phone": phone, "headers": h, "context": ctx, "branch_id": main["id"], "session": session}
 
     return _make
 

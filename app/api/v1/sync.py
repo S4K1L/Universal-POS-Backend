@@ -1,14 +1,10 @@
-import uuid
-
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import Ctx, tenant_ctx
-from app.core.errors import NotFoundError
 from app.db.session import get_db
 from app.models.sync import SyncChange
-from app.models.tenant import Device
 from app.schemas.sync import PushIn
 from app.services import sync as sync_service
 
@@ -27,12 +23,9 @@ async def push(body: PushIn, ctx: Ctx = Depends(push_gate), db: AsyncSession = D
 
 
 @router.get("/pull", summary="Changes since a cursor (0 = everything)")
-async def pull(device_id: uuid.UUID, cursor: int = Query(default=0, ge=0), limit: int = Query(default=500, ge=1, le=1000),
+async def pull(cursor: int = Query(default=0, ge=0), limit: int = Query(default=500, ge=1, le=1000),
                ctx: Ctx = Depends(gate), db: AsyncSession = Depends(get_db)) -> dict:
-    device = await db.get(Device, device_id)
-    if device is None or device.tenant_id != ctx.tenant.id or not device.active:
-        raise NotFoundError("This device is not registered", code="unknown_device")
-    out = await sync_service.pull(db, tenant=ctx.tenant, user=ctx.user, device=device, cursor=cursor, limit=limit)
+    out = await sync_service.pull(db, tenant=ctx.tenant, user=ctx.user, cursor=cursor, limit=limit)
     await db.commit()
     return out
 
