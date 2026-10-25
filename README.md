@@ -39,6 +39,18 @@ Password `demo12345` for all shops; the platform admin is `01700000000` / `admin
 | 01755000001 | Shefa Pharmacy | pharmacy | owner |
 | 01700000000 | Platform console | — | super admin |
 
+## Docker (production)
+
+The database is external — point `DATABASE_URL` in `.env` at it. The compose file forces `ENV=production`, so `.env`
+must also pass the production checklist below.
+
+```bash
+docker compose up -d --build                                # runs migrations, then serves on :8000
+docker compose run --rm api python -m scripts.seed_platform # first deploy only, with SEED_ADMIN_PASSWORD in .env
+```
+
+`WEB_CONCURRENCY` sets the worker count (default 2). Each worker opens up to 30 database connections.
+
 ## Maintenance mode
 
 Switching maintenance on (admin console → Settings) makes every business route answer

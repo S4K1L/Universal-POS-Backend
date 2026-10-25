@@ -1,0 +1,28 @@
+# Production stack. The database is external (e.g. Supabase): set DATABASE_URL in .env.
+#
+#   docker compose up -d --build                                # migrate, then serve on :8000
+#   docker compose run --rm api python -m scripts.seed_platform # once, with SEED_ADMIN_PASSWORD in .env
+x-app: &app
+  build: .
+  image: universal-pos-backend
+  env_file: .env
+
+services:
+  migrate:
+    <<: *app
+    environment:
+      ENV: production
+    command: ["alembic", "upgrade", "head"]
+    restart: "no"
+
+  api:
+    <<: *app
+    environment:
+      ENV: production
+      WEB_CONCURRENCY: ${WEB_CONCURRENCY:-2}
+    ports:
+      - "8000:8000"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    restart: unless-stopped
