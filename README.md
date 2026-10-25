@@ -49,6 +49,10 @@ docker compose up -d --build                                # runs migrations, t
 docker compose run --rm api python -m scripts.seed_platform # first deploy only, with SEED_ADMIN_PASSWORD in .env
 ```
 
+Port 8000 is only exposed to the Docker network, not the host — the reverse proxy reaches it there. On Coolify, set the
+api service's domain to `https://api.example.com:8000` (the port tells the proxy where to route). To hit it directly on
+a plain Docker host, run `docker compose run --rm -p 8000:8000 api` instead.
+
 `WEB_CONCURRENCY` sets the worker count (default 2). Each worker opens up to 30 database connections.
 
 ## Maintenance mode
