@@ -45,13 +45,11 @@ The database is external — point `DATABASE_URL` in `.env` at it. The compose f
 must also pass the production checklist below.
 
 ```bash
-docker compose up -d --build                                # runs migrations, then serves on :8000
+docker compose up -d --build                                # runs migrations, then serves on host port 9000
 docker compose run --rm api python -m scripts.seed_platform # first deploy only, with SEED_ADMIN_PASSWORD in .env
 ```
 
-Port 8000 is only exposed to the Docker network, not the host — the reverse proxy reaches it there. On Coolify, set the
-api service's domain to `https://api.example.com:8000` (the port tells the proxy where to route). To hit it directly on
-a plain Docker host, run `docker compose run --rm -p 8000:8000 api` instead.
+Set `API_PORT` to publish on a different host port.
 
 `WEB_CONCURRENCY` sets the worker count (default 2). Each worker opens up to 30 database connections.
 
