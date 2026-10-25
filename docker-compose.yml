@@ -21,7 +21,7 @@ services:
       ENV: production
       WEB_CONCURRENCY: ${WEB_CONCURRENCY:-2}
     ports:
-      - "${API_PORT:-9000}:8000"  # host port is configurable; 8000 is taken on the deploy server
+      - "0.0.0.0:${API_PORT:-9000}:8000"  # host port is configurable; 8000 is taken on the deploy server
     depends_on:
       migrate:
         condition: service_completed_successfully
