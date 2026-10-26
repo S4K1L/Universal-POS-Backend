@@ -92,6 +92,7 @@ def tenant_ctx(
             raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Business not found")
         plan = await subscription.get_plan(db, tenant)
         ctx = Ctx(user, tenant, plan, claims.impersonated_by)
+        db.info["impersonated_by"] = claims.impersonated_by  # read by services.common.audit, so no call site can forget it
 
         state = subscription.subscription_state(tenant, await subscription.grace_days(db))
         if state.state in ("suspended", "cancelled") and not allow_suspended:

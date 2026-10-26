@@ -6,7 +6,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import Ctx, tenant_ctx
-from app.api.v1.auth import normalise_phone
+from app.api.v1.auth import normalise_phone, revoke_sessions
 from app.core.errors import ConflictError, NotFoundError, PermissionDenied, ValidationFailed
 from app.core.permissions import ASSIGNABLE_ROLES, Permission, ROLE_LABELS, ROLE_PERMISSIONS, UNGRANTABLE
 from app.core.security import hash_secret
@@ -98,6 +98,7 @@ async def create_user(body: UserIn, ctx: Ctx = Depends(manage), db: AsyncSession
     u = User(tenant_id=ctx.tenant.id, name=body.name.strip(), phone=phone, email=body.email, password_hash=hash_secret(body.password),
              role=body.role, permissions=_check_permissions(body.permissions), branch_ids=branch_ids)
     db.add(u)
+    await db.flush()  # the id is assigned on flush; the audit row needs it
     await audit(db, action="staff.created", actor=ctx.user, tenant_id=ctx.tenant.id, entity="user", entity_id=u.id, summary=f"{u.name} ({u.role})")
     await db.commit()
     return context_service.user_out(u)
@@ -115,6 +116,11 @@ async def update_user(user_id: uuid.UUID, body: UserPatch, ctx: Ctx = Depends(ma
             raise ValidationFailed("Unknown role", code="validation_failed")
         if body.role == "owner" and ctx.user.role != "owner":
             raise PermissionDenied("Only an owner can promote to owner")
+        if u.role == "owner" and body.role != "owner":
+            others = (await db.execute(select(User.id).where(
+                User.tenant_id == ctx.tenant.id, User.role == "owner", User.active.is_(True), User.id != u.id).limit(1))).first()
+            if others is None:
+                raise ConflictError("A business needs at least one owner", code="last_owner")
         u.role = body.role
         if body.role == "owner":
             u.branch_ids = None  # an owner always sees every branch
@@ -130,6 +136,7 @@ async def update_user(user_id: uuid.UUID, body: UserPatch, ctx: Ctx = Depends(ma
         u.active = body.active
     if body.password:
         u.password_hash = hash_secret(body.password)
+        await revoke_sessions(db, u.id)
     if body.clear_permissions:
         u.permissions = None
     elif body.permissions is not None:

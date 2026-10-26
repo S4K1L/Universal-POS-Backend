@@ -26,7 +26,8 @@ def _encode(claims: dict[str, Any], ttl: timedelta) -> str:
 
 
 def create_access_token(
-    *, user_id: uuid.UUID, tenant_id: uuid.UUID | None, role: str, impersonated_by: uuid.UUID | None = None
+    *, user_id: uuid.UUID, tenant_id: uuid.UUID | None, role: str, impersonated_by: uuid.UUID | None = None,
+    ttl: timedelta | None = None,
 ) -> str:
     claims: dict[str, Any] = {
         "sub": str(user_id),
@@ -36,7 +37,7 @@ def create_access_token(
     }
     if impersonated_by:
         claims["impersonated_by"] = str(impersonated_by)
-    return _encode(claims, timedelta(minutes=settings.access_token_expire_minutes))
+    return _encode(claims, ttl or timedelta(minutes=settings.access_token_expire_minutes))
 
 
 def create_refresh_token(*, user_id: uuid.UUID) -> tuple[str, str, datetime]:

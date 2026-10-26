@@ -13,7 +13,7 @@ import uuid
 from datetime import date
 
 from pydantic import ValidationError
-from sqlalchemy import delete, func, select, text
+from sqlalchemy import delete, func, literal_column, select, text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -142,7 +142,10 @@ async def _h_expense_create(session, tenant, actor, ev):
     branch = await session.get(Branch, p.branch_id)
     if branch is None or branch.tenant_id != tenant.id:
         raise RejectEvent("Unknown branch", code="unknown_branch")
-    if await session.get(Expense, p.id) is None:
+    existing = await session.get(Expense, p.id)
+    if existing is not None and existing.tenant_id != tenant.id:
+        raise RejectEvent("Id already used", code="id_conflict")
+    if existing is None:
         session.add(Expense(
             id=p.id, tenant_id=tenant.id, branch_id=branch.id,
             category=p.category, amount=p.amount, method=p.method, note=p.note, spent_at=p.spent_at or ev.occurred_at,
@@ -155,7 +158,13 @@ async def _h_shift_open(session, tenant, actor, ev):
     p = _validate(ShiftOpenIn, ev.payload)
     if not await _can(actor, "manage_shifts"):
         raise RejectEvent("This account may not open a shift", code="permission_denied")
-    if await session.get(Shift, p.id) is None:
+    branch = await session.get(Branch, p.branch_id)
+    if branch is None or branch.tenant_id != tenant.id:
+        raise RejectEvent("Unknown branch", code="unknown_branch")
+    existing = await session.get(Shift, p.id)
+    if existing is not None and existing.tenant_id != tenant.id:
+        raise RejectEvent("Id already used", code="id_conflict")
+    if existing is None:
         session.add(Shift(
             id=p.id, tenant_id=tenant.id, branch_id=p.branch_id,
             opened_by=actor.id, opened_by_name=actor.name, opened_at=p.opened_at, opening_float=p.opening_float, status="open",
@@ -211,6 +220,11 @@ async def push(session: AsyncSession, *, tenant: Tenant, user: User, payload: Pu
                 from app.services.sales import _actor  # local import: tiny helper shared with sales
 
                 actor = await _actor(session, tenant.id, ev.actor_id, user)
+                if actor.id != user.id and not (
+                    effective_permissions(actor.role, actor.permissions) <= effective_permissions(user.role, user.permissions)
+                ):
+                    # A till may hand over a colleague's queued events, never act as someone more powerful than itself.
+                    raise RejectEvent("This account may not submit events on behalf of that user", code="actor_not_permitted")
                 result = await handler(session, tenant, actor, ev)
                 session.add(SyncEvent(tenant_id=tenant.id, event_id=ev.id, type=ev.type, result=result))
                 await session.flush()
@@ -219,7 +233,9 @@ async def push(session: AsyncSession, *, tenant: Tenant, user: User, payload: Pu
             results.append({"id": str(ev.id), "status": "rejected", "code": exc.code, "message": exc.detail, **exc.extra})
         except IntegrityError:
             # A concurrent retry of the same event won the race — report what it stored.
-            session.expire_all()
+            # The rolled-back savepoint expired what it touched; reload the two objects the rest of the batch relies on.
+            await session.refresh(tenant)
+            await session.refresh(user)
             stored = (await session.execute(
                 select(SyncEvent).where(SyncEvent.tenant_id == tenant.id, SyncEvent.event_id == ev.id)
             )).scalar_one_or_none()
@@ -257,12 +273,23 @@ async def pull(
     conditions = [SyncChange.tenant_id == tenant.id, SyncChange.seq > cursor]
     if user.branch_ids is not None:  # a branch-restricted user only receives their own branches' rows
         conditions.append(SyncChange.branch_id.is_(None) | SyncChange.branch_id.in_([uuid.UUID(b) for b in user.branch_ids]))
-    rows = (await session.execute(
-        select(SyncChange)
+    # `seq` is handed out when a change is written, but only becomes visible when its transaction commits, so a
+    # later seq can be readable before an earlier one. Serving past such a gap would let a device's cursor skip the
+    # earlier change for good. `txid` lets us stop at the first change whose transaction may still be running.
+    settled = SyncChange.txid < literal_column("pg_snapshot_xmin(pg_current_snapshot())::text::bigint")
+    fetched = (await session.execute(
+        select(SyncChange, settled)
         .where(*conditions)
         .order_by(SyncChange.seq).limit(limit + 1)
-    )).scalars().all()
-    has_more = len(rows) > limit
+    )).all()
+    rows: list[SyncChange] = []
+    blocked = False
+    for change, is_settled in fetched:
+        if not is_settled:
+            blocked = True
+            break
+        rows.append(change)
+    has_more = not blocked and len(rows) > limit  # when blocked, the device simply asks again on its next cycle
     rows = rows[:limit]
     next_cursor = rows[-1].seq if rows else cursor
 

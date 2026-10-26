@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import BigInteger, ForeignKey, Identity, Index, String, UniqueConstraint, func
+from sqlalchemy import BigInteger, ForeignKey, Identity, Index, String, UniqueConstraint, func, text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -25,7 +25,10 @@ class SyncChange(Base):
     """What changed, in order. Devices pull `seq > cursor` and re-read the current row."""
 
     __tablename__ = "sync_changes"
-    __table_args__ = (Index("ix_sync_changes_tenant_seq", "tenant_id", "seq"),)
+    __table_args__ = (
+        Index("ix_sync_changes_tenant_seq", "tenant_id", "seq"),
+        Index("ix_sync_changes_entity", "tenant_id", "entity", "entity_id"),  # compaction looks up newer rows per entity
+    )
 
     seq: Mapped[int] = mapped_column(BigInteger, Identity(always=False), primary_key=True)
     tenant_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("tenants.id", ondelete="CASCADE"))
@@ -34,3 +37,5 @@ class SyncChange(Base):
     op: Mapped[str] = mapped_column(String(8), default="upsert")
     branch_id: Mapped[uuid.UUID | None] = mapped_column(nullable=True)
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
+    # The writing transaction's id (xid8 as a bigint); pull stops at a change whose transaction may still be open.
+    txid: Mapped[int] = mapped_column(BigInteger, server_default=text("(pg_current_xact_id()::text::bigint)"))

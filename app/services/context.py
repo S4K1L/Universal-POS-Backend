@@ -13,7 +13,7 @@ from app.services.common import utcnow
 # id, label, required plan feature, required capability, required permission (any of)
 MODULES = [
     ("dashboard", "Dashboard", None, None, None),
-    ("pos", "Sell", "pos", None, ("sell",)),
+    ("pos", "POS", "pos", None, ("sell",)),
     ("orders", "Orders", "orders", "document_flow", ("manage_orders",)),
     ("sales", "Sales", "pos", None, ("view_sales",)),
     ("products", "Products", "inventory", None, ("view_inventory",)),
