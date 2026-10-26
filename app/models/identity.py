@@ -38,3 +38,4 @@ class RefreshToken(UUIDPK, Timestamps, Base):
     jti: Mapped[str] = mapped_column(String(64), unique=True, index=True)
     expires_at: Mapped[datetime] = mapped_column()
     revoked: Mapped[bool] = mapped_column(default=False)
+    rotated_at: Mapped[datetime | None] = mapped_column(nullable=True)  # when this token was exchanged for the next pair

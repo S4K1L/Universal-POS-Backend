@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.deps import require_super_admin
 from app.core.capabilities import CAPABILITIES
 from app.core.errors import ConflictError, NotFoundError, ValidationFailed
+from app.api.v1.auth import revoke_sessions
 from app.core.security import create_access_token, hash_secret
 from app.db.session import get_db
 from app.models.catalogue import Product
@@ -163,7 +164,8 @@ async def impersonate(tenant_id: uuid.UUID, admin: User = Depends(require_super_
         raise NotFoundError("This business has no active owner")
     await audit(db, action="tenant.impersonated", actor=admin, tenant_id=None, entity="tenant", entity_id=tenant_id, summary=f"Support session as {owner.name}")
     await db.commit()
-    token = create_access_token(user_id=owner.id, tenant_id=tenant_id, role=owner.role, impersonated_by=admin.id)
+    token = create_access_token(user_id=owner.id, tenant_id=tenant_id, role=owner.role, impersonated_by=admin.id,
+                                 ttl=timedelta(minutes=30))
     return {"access_token": token, "token_type": "bearer", "owner": owner.name}
 
 
@@ -174,6 +176,7 @@ async def reset_owner_password(tenant_id: uuid.UUID, admin: User = Depends(requi
         raise NotFoundError("This business has no owner")
     password = provisioning.generate_password()
     owner.password_hash = hash_secret(password)
+    await revoke_sessions(db, owner.id)
     await audit(db, action="tenant.owner_password_reset", actor=admin, tenant_id=None, entity="user", entity_id=owner.id, summary=owner.name)
     await db.commit()
     return {"phone": owner.phone, "password": password}

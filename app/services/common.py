@@ -73,7 +73,7 @@ async def audit(
             actor_id=getattr(actor, "id", None),
             actor_name=getattr(actor, "name", "") or "system",
             actor_role=getattr(actor, "role", ""),
-            impersonated_by=impersonated_by,
+            impersonated_by=impersonated_by or session.info.get("impersonated_by"),
             action=action,
             entity=entity,
             entity_id=str(entity_id),

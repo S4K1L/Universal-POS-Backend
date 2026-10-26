@@ -122,6 +122,7 @@ async def create_branch(body: BranchIn, ctx: Ctx = Depends(tenant_ctx(permission
     b = Branch(tenant_id=ctx.tenant.id, name=body.name.strip(), code=(body.code or body.name[:4]).upper(), address=body.address,
                phone=body.phone, manager_name=body.manager_name, active=body.active)
     db.add(b)
+    await db.flush()
     await audit(db, action="branch.created", actor=ctx.user, tenant_id=ctx.tenant.id, entity="branch", entity_id=b.id, summary=b.name)
     await db.commit()
     return branch_out(b)

@@ -10,11 +10,21 @@ async def test_wrong_password_and_inactive_users_cannot_sign_in(client, make_ten
     assert ok.status_code == 200  # +880 format is normalised
 
 
-async def test_refresh_rotates_and_the_old_token_dies(client, make_tenant):
+async def test_refresh_rotates_and_the_old_token_dies(client, make_tenant, db):
+    from datetime import timedelta
+
+    from sqlalchemy import update
+
+    from app.models.identity import RefreshToken
+    from app.services.common import utcnow
+
     shop = await make_tenant("local_shop")
     old = shop["session"]["refresh_token"]
     r1 = await client.post("/api/v1/auth/refresh", json={"refresh_token": old})
     assert r1.status_code == 200 and r1.json()["refresh_token"] != old
+    # a rotated token is forgiven for a moment (lost response, second tab) — once that moment has passed it is dead
+    await db.execute(update(RefreshToken).where(RefreshToken.revoked.is_(True)).values(rotated_at=utcnow() - timedelta(minutes=5)))
+    await db.commit()
     r2 = await client.post("/api/v1/auth/refresh", json={"refresh_token": old})
     assert r2.status_code == 401
     out = await client.post("/api/v1/auth/logout", json={"refresh_token": r1.json()["refresh_token"]})
