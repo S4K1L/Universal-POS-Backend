@@ -25,11 +25,11 @@ PLANS = [
 ]
 
 CHANNELS = [
-    dict(kind="bkash", label="bKash (demo — replace)", account_name="Universal POS", account_number="01700000000", wallet_type="merchant",
+    dict(kind="bkash", label="bKash (demo — replace)", account_name="Orbin", account_number="01700000000", wallet_type="merchant",
          instructions="Send money to this number, then paste the transaction ID (TrxID) into the app.", sort_order=1),
-    dict(kind="nagad", label="Nagad (demo — replace)", account_name="Universal POS", account_number="01700000001", wallet_type="merchant",
+    dict(kind="nagad", label="Nagad (demo — replace)", account_name="Orbin", account_number="01700000001", wallet_type="merchant",
          instructions="Send money to this number, then paste the transaction ID into the app.", sort_order=2),
-    dict(kind="bank", label="Bank transfer (demo — replace)", account_name="Universal POS Ltd", account_number="0000000000000", bank_name="Example Bank",
+    dict(kind="bank", label="Bank transfer (demo — replace)", account_name="Orbin Ltd", account_number="0000000000000", bank_name="Example Bank",
          branch_name="Dhaka Main", routing_number="000000000", instructions="Transfer the exact amount and enter the reference number.", sort_order=3),
 ]
 

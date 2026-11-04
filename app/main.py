@@ -36,7 +36,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="Universal POS API",
+    title="Orbin API",
     version="1.0.0",
     description=(
         "Multi-tenant, offline-first POS for any kind of shop. A business's **type** (supershop, furniture, cosmetic, "

@@ -1,6 +1,6 @@
-# Universal POS — Backend
+# Orbin — Backend
 
-The API behind [Universal POS](https://github.com/S4K1L/Universal-POS): one point-of-sale for every kind of shop in
+The API behind [Orbin](https://github.com/S4K1L/Universal-POS): one point-of-sale for every kind of shop in
 Bangladesh, offline-first, with subscription prices and limits set from an admin console.
 
 FastAPI · SQLAlchemy 2 (async) · PostgreSQL · Alembic — 116 endpoints, 302 tests.
