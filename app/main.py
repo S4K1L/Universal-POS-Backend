@@ -12,6 +12,7 @@ from app.api.v1 import auth, billing, catalogue, customers, inventory, orders, p
 from app.api.v1.admin import billing as admin_billing
 from app.api.v1.admin import catalog as admin_catalog
 from app.api.v1.admin import signups as admin_signups
+from app.api.v1.admin import users as admin_users
 from app.api.v1.admin import tenants as admin_tenants
 from app.core.config import settings
 from app.core.errors import DomainError
@@ -81,7 +82,7 @@ async def health() -> dict:
 
 P = "/api/v1"
 for module in (auth, public, workspace, users, catalogue, inventory, customers, sales, orders, sync, reports, billing, uploads,
-               admin_tenants, admin_signups, admin_catalog, admin_billing):
+               admin_tenants, admin_signups, admin_users, admin_catalog, admin_billing):
     app.include_router(module.router, prefix=P)
 
 
