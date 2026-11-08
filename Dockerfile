@@ -21,6 +21,9 @@ COPY alembic.ini ./
 COPY alembic ./alembic
 COPY app ./app
 COPY scripts ./scripts
+# Product pictures are written here; a volume mounted on it (see docker-compose.yml) keeps them across deploys.
+RUN mkdir -p /app/uploads && chown app:app /app/uploads
+VOLUME /app/uploads
 USER app
 
 EXPOSE 8000

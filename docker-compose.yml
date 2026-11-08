@@ -25,4 +25,9 @@ services:
     depends_on:
       migrate:
         condition: service_completed_successfully
+    volumes:
+      - uploads:/app/uploads  # product pictures survive redeploys
     restart: unless-stopped
+
+volumes:
+  uploads:

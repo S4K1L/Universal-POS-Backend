@@ -4,10 +4,14 @@ from fastapi import APIRouter, Depends, File, UploadFile
 
 from app.api.deps import Ctx, tenant_ctx
 from app.core.config import settings
-from app.core.errors import ValidationFailed
+from app.core.errors import DomainError, ValidationFailed
 from app.core.permissions import Permission
 
 router = APIRouter(prefix="/uploads", tags=["Catalogue"])
+
+
+class StorageUnavailable(DomainError):
+    status_code = 503
 
 # Only raster images, recognised by their first bytes — never by the filename or the declared content type,
 # which a client controls. SVG is refused on purpose: it can carry script.
@@ -38,7 +42,10 @@ async def upload_image(file: UploadFile = File(...), ctx: Ctx = Depends(tenant_c
     if ext is None:
         raise ValidationFailed("Choose a JPEG, PNG, WebP or GIF picture", code="unsupported_image")
     folder = settings.upload_root / str(ctx.tenant.id)
-    folder.mkdir(parents=True, exist_ok=True)
     name = f"{uuid.uuid4().hex}.{ext}"
-    (folder / name).write_bytes(data)
+    try:
+        folder.mkdir(parents=True, exist_ok=True)
+        (folder / name).write_bytes(data)
+    except OSError as exc:
+        raise StorageUnavailable("Picture storage is not available on the server right now", code="storage_unavailable") from exc
     return {"url": f"/uploads/{ctx.tenant.id}/{name}", "bytes": len(data)}

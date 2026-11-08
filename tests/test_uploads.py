@@ -63,3 +63,12 @@ async def test_product_image_url_must_be_an_upload_or_a_web_address(client, make
         assert r.status_code == 422, bad
     ok = await client.post(f"{BASE}/products", headers=shop["headers"], json={"name": "Ok", "image_url": "https://example.com/a.png", "variants": [{"price": "1.00"}]})
     assert ok.status_code == 201
+
+
+async def test_unwritable_storage_is_a_clear_503_not_a_crash(client, make_tenant, monkeypatch):
+    from app.core.config import settings
+
+    shop = await make_tenant("local_shop")
+    monkeypatch.setattr(settings, "upload_dir", "/proc/orbin-cannot-write-here")
+    r = await upload(client, shop["headers"], PNG)
+    assert r.status_code == 503 and r.json()["code"] == "storage_unavailable"

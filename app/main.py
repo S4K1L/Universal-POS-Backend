@@ -1,3 +1,4 @@
+import logging
 from contextlib import asynccontextmanager
 
 from fastapi import Depends, FastAPI, Request
@@ -85,5 +86,10 @@ for module in (auth, public, workspace, users, catalogue, inventory, customers, 
 
 
 # Product images. Names are unguessable UUIDs and only images are ever written (see api/v1/uploads.py).
-settings.upload_root.mkdir(parents=True, exist_ok=True)
-app.mount("/uploads", StaticFiles(directory=settings.upload_root), name="uploads")
+# If the folder cannot be created (read-only filesystem, wrong owner) the API still starts — only pictures are
+# unavailable, and uploading says so — rather than the whole service refusing to boot.
+try:
+    settings.upload_root.mkdir(parents=True, exist_ok=True)
+    app.mount("/uploads", StaticFiles(directory=settings.upload_root), name="uploads")
+except OSError as exc:  # pragma: no cover - depends on the host
+    logging.getLogger("uvicorn.error").warning("Product pictures disabled: cannot use %s (%s)", settings.upload_root, exc)
