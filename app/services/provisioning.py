@@ -66,7 +66,8 @@ def _template_settings(definition: dict, *, language: str, base: dict | None = N
     return settings
 
 
-async def provision_tenant(session: AsyncSession, *, admin: User | None, payload: TenantCreateIn) -> tuple[Tenant, User, str]:
+async def provision_tenant(session: AsyncSession, *, admin: User | None, payload: TenantCreateIn, password_hash: str | None = None) -> tuple[Tenant, User, str]:
+    """`password_hash` lets a self-service signup keep the password its owner chose (the plain text is never stored)."""
     bt = (await session.execute(select(BusinessType).where(BusinessType.key == payload.business_type_key, BusinessType.active.is_(True)))).scalar_one_or_none()
     if bt is None:
         raise NotFoundError(f"Unknown business type: {payload.business_type_key}")
@@ -108,10 +109,10 @@ async def provision_tenant(session: AsyncSession, *, admin: User | None, payload
     for tc in tax_classes:
         session.add(TaxClass(tenant_id=tenant.id, name=tc["name"], rate=tc["rate"], is_default=bool(tc.get("default"))))
 
-    password = payload.password or generate_password()
+    password = payload.password or ("" if password_hash else generate_password())
     owner = User(
         tenant_id=tenant.id, name=payload.owner_name.strip(), phone=payload.phone, email=payload.email,
-        password_hash=hash_secret(password), role="owner",
+        password_hash=password_hash or hash_secret(password), role="owner",
     )
     session.add(owner)
     await session.flush()

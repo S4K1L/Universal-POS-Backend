@@ -4,11 +4,13 @@ from fastapi import Depends, FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
 
 from app.api.deps import maintenance_gate
-from app.api.v1 import auth, billing, catalogue, customers, inventory, orders, public, reports, sales, sync, users, workspace
+from app.api.v1 import auth, billing, catalogue, customers, inventory, orders, public, reports, sales, sync, uploads, users, workspace
 from app.api.v1.admin import billing as admin_billing
 from app.api.v1.admin import catalog as admin_catalog
+from app.api.v1.admin import signups as admin_signups
 from app.api.v1.admin import tenants as admin_tenants
 from app.core.config import settings
 from app.core.errors import DomainError
@@ -77,6 +79,11 @@ async def health() -> dict:
 
 
 P = "/api/v1"
-for module in (auth, public, workspace, users, catalogue, inventory, customers, sales, orders, sync, reports, billing,
-               admin_tenants, admin_catalog, admin_billing):
+for module in (auth, public, workspace, users, catalogue, inventory, customers, sales, orders, sync, reports, billing, uploads,
+               admin_tenants, admin_signups, admin_catalog, admin_billing):
     app.include_router(module.router, prefix=P)
+
+
+# Product images. Names are unguessable UUIDs and only images are ever written (see api/v1/uploads.py).
+settings.upload_root.mkdir(parents=True, exist_ok=True)
+app.mount("/uploads", StaticFiles(directory=settings.upload_root), name="uploads")

@@ -112,6 +112,27 @@ class PaymentRequest(UUIDPK, Timestamps, Base):
     invoice_id: Mapped[uuid.UUID | None] = mapped_column(nullable=True)
 
 
+class SignupRequest(UUIDPK, Timestamps, Base):
+    """Someone asked to open a business. Nothing exists for them until a super admin approves it and assigns a plan."""
+
+    __tablename__ = "signup_requests"
+    __table_args__ = (
+        Index("uq_signup_requests_live_phone", "phone", unique=True, postgresql_where=text("status = 'pending'")),
+    )
+
+    phone: Mapped[str] = mapped_column(String(20), index=True)
+    password_hash: Mapped[str] = mapped_column(String(200))  # becomes the owner's password on approval
+    business_name: Mapped[str] = mapped_column(String(160))
+    business_type_key: Mapped[str] = mapped_column(String(40))
+    language: Mapped[str] = mapped_column(String(2), default="bn")
+    status: Mapped[str] = mapped_column(String(16), default="pending")  # pending|approved|rejected
+    reviewed_by_name: Mapped[str] = mapped_column(String(160), default="")
+    reviewed_at: Mapped[datetime | None] = mapped_column(nullable=True)
+    reject_reason: Mapped[str] = mapped_column(String(300), default="")
+    plan_key: Mapped[str] = mapped_column(String(40), default="")  # the package the admin assigned
+    tenant_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("tenants.id", ondelete="SET NULL"), nullable=True)
+
+
 class SubscriptionInvoice(UUIDPK, Timestamps, Base):
     __tablename__ = "subscription_invoices"
 

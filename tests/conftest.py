@@ -52,9 +52,10 @@ async def client(engine):
             yield s
 
     app.dependency_overrides[db_session.get_db] = override
-    from app.api.v1.auth import _FAILS
+    from app.api.v1.auth import _FAILS, _SIGNUPS
 
     _FAILS.clear()
+    _SIGNUPS.clear()
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as c:
         yield c
     app.dependency_overrides.clear()

@@ -53,7 +53,7 @@ class ProductIn(Strict):
     track_expiry: bool = False
     tax_class_id: uuid.UUID | None = None
     attributes: dict = Field(default_factory=dict)
-    image_url: str = Field(default="", max_length=500)
+    image_url: str = Field(default="", max_length=500, pattern=r"^(|/uploads/[0-9a-f-]{36}/[0-9a-f]{32}\.(jpg|png|gif|webp)|https?://\S{1,480})$")
     reorder_level: Qty = Field(default=Decimal("0"), ge=0)
     warranty_months: int = Field(default=0, ge=0, le=240)
     variants: list[VariantIn] = Field(min_length=1, max_length=100)
@@ -73,7 +73,7 @@ class ProductPatch(Strict):
     tax_class_id: uuid.UUID | None = None
     clear_tax_class: bool = False
     attributes: dict | None = None
-    image_url: str | None = Field(default=None, max_length=500)
+    image_url: str | None = Field(default=None, max_length=500, pattern=r"^(|/uploads/[0-9a-f-]{36}/[0-9a-f]{32}\.(jpg|png|gif|webp)|https?://\S{1,480})$")
     reorder_level: Qty | None = Field(default=None, ge=0)
     warranty_months: int | None = Field(default=None, ge=0, le=240)
     active: bool | None = None

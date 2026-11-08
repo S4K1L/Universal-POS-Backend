@@ -1,3 +1,4 @@
+import re
 import time
 import uuid
 from collections import defaultdict
@@ -9,19 +10,22 @@ from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import current_user
-from app.core.errors import ValidationFailed
+from app.core.errors import PermissionDenied, ValidationFailed
 from app.core.security import create_access_token, create_refresh_token, decode_token, hash_secret, verify_secret
 from app.core.config import settings
 from app.db.session import get_db
 from app.models.identity import RefreshToken, User
+from app.models.platform import SignupRequest
 from app.models.tenant import Tenant
 from app.schemas.common import Strict
 from app.services import context as context_service
+from app.services import signups as signup_service
 from app.services.common import utcnow
 
 router = APIRouter(prefix="/auth", tags=["Auth"])
 
 _FAILS: dict[str, list[float]] = defaultdict(list)
+_SIGNUPS: dict[str, list[float]] = defaultdict(list)
 # Per-process brake; put a shared limiter in front for a multi-instance deploy. Failures are counted per
 # (phone, client address) so a stranger cannot lock a shop out, plus a much higher ceiling per phone alone
 # that still stops a brute force spread over many addresses.
@@ -37,6 +41,19 @@ def normalise_phone(raw: str) -> str:
 
 
 class LoginIn(Strict):
+    phone: str = Field(min_length=6, max_length=20)
+    password: str = Field(min_length=1, max_length=72)
+
+
+class SignupIn(Strict):
+    phone: str = Field(min_length=6, max_length=20)
+    password: str = Field(min_length=8, max_length=72)
+    business_name: str = Field(min_length=2, max_length=160)
+    business_type_key: str = Field(min_length=1, max_length=40)
+    language: str = Field(default="bn", pattern="^(en|bn)$")
+
+
+class SignupStatusIn(Strict):
     phone: str = Field(min_length=6, max_length=20)
     password: str = Field(min_length=1, max_length=72)
 
@@ -90,6 +107,12 @@ async def login(body: LoginIn, request: Request, db: AsyncSession = Depends(get_
     user = (await db.execute(select(User).where(User.phone == phone))).scalar_one_or_none()
     # Always spend a bcrypt check, so an unknown phone takes as long as a wrong password.
     password_ok = verify_secret(body.password, user.password_hash if user is not None else _dummy_hash())
+    if user is None:
+        waiting = await _signup_for(db, phone, body.password)
+        if waiting is not None and waiting.status == "pending":
+            raise PermissionDenied("Your request is still being reviewed", code="signup_pending")
+        if waiting is not None and waiting.status == "rejected":
+            raise PermissionDenied(waiting.reject_reason or "Your request was not approved", code="signup_rejected")
     if user is None or not user.active or not password_ok:
         _FAILS[pair].append(now)
         _FAILS[phone].append(now)
@@ -100,6 +123,46 @@ async def login(body: LoginIn, request: Request, db: AsyncSession = Depends(get_
     payload = await session_payload(db, user, tokens)
     await db.commit()
     return payload
+
+
+async def _signup_for(db: AsyncSession, phone: str, password: str) -> SignupRequest | None:
+    """The newest signup request for this phone, but only if the password matches it (so status never leaks to a stranger)."""
+    req = (await db.execute(select(SignupRequest).where(SignupRequest.phone == phone).order_by(SignupRequest.created_at.desc()).limit(1))).scalar_one_or_none()
+    return req if req is not None and verify_secret(password, req.password_hash) else None
+
+
+def _brake(request: Request, key: str, limit: int, window: int) -> None:
+    now = time.time()
+    pair = f"{key}|{request.client.host if request.client else ''}"
+    _SIGNUPS[pair] = [t for t in _SIGNUPS[pair] if now - t < window]
+    if len(_SIGNUPS[pair]) >= limit:
+        raise HTTPException(status.HTTP_429_TOO_MANY_REQUESTS, "Too many attempts. Try again in a few minutes.")
+    _SIGNUPS[pair].append(now)
+
+
+@router.post("/signup", status_code=201, summary="Ask to open a business — waits for a super admin to approve")
+async def signup(body: SignupIn, request: Request, db: AsyncSession = Depends(get_db)) -> dict:
+    _brake(request, "signup", 10, 3600)
+    phone = normalise_phone(body.phone)
+    if not re.fullmatch(r"01[3-9]\d{8}", phone):
+        raise ValidationFailed("Enter a Bangladesh mobile number like 01712345678")
+    req = await signup_service.create_request(db, phone=phone, password=body.password, business_name=body.business_name,
+                                              business_type_key=body.business_type_key, language=body.language)
+    await db.commit()
+    return signup_service.request_out(req)
+
+
+@router.post("/signup/status", summary="Where is my request? (phone + the password chosen at signup)")
+async def signup_status(body: SignupStatusIn, request: Request, db: AsyncSession = Depends(get_db)) -> dict:
+    phone = normalise_phone(body.phone)
+    _brake(request, f"signup-status:{phone}", 120, 600)
+    req = await _signup_for(db, phone, body.password)
+    if req is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "No request found for that number and password")
+    from app.models.platform import BusinessType
+
+    bt = (await db.execute(select(BusinessType).where(BusinessType.key == req.business_type_key))).scalar_one_or_none()
+    return signup_service.request_out(req, business_type_label=bt.label if bt else None)
 
 
 @router.post("/refresh", summary="Exchange a refresh token for a new pair (rotates)")

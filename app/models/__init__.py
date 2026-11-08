@@ -6,7 +6,7 @@ from app.models.inventory import (  # noqa: F401
 )
 from app.models.orders import Order, OrderLine, OrderPayment  # noqa: F401
 from app.models.platform import (  # noqa: F401
-    AuditLog, BusinessType, PaymentChannel, PaymentRequest, Plan, PlatformSetting, SubscriptionInvoice,
+    AuditLog, BusinessType, PaymentChannel, PaymentRequest, Plan, PlatformSetting, SignupRequest, SubscriptionInvoice,
 )
 from app.models.sales import (  # noqa: F401
     Expense, Sale, SaleLine, SaleLineAllocation, SalePayment, SaleReturn, SaleReturnLine, Shift,
